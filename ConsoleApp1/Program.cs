@@ -1,6 +1,8 @@
-﻿using BenchmarkDotNet.Attributes;
+﻿#if !NET452
+using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
+#endif
 
 using System;
 using System.Diagnostics;
@@ -18,10 +20,10 @@ namespace ConsoleApp1
             Console.WriteLine($"expression: {MeasureExecTime(ActivityTester.ActivityWithExpressionVoid)}");
             Console.WriteLine($"dynamicmethod: {MeasureExecTime(ActivityTester.ActivityWithDynamicMethodVoid)}");
 
-            var summary = BenchmarkRunner.Run<ActivityTester>();
+            //var summary = BenchmarkRunner.Run<ActivityTester>();
             //var summary = BenchmarkRunner.Run<ActivityNameTester>();
-            Console.WriteLine(summary);
-            Console.ReadKey();
+            //Console.WriteLine(summary);
+            //Console.ReadKey();
         }
 
         private static long MeasureExecTime(Action action)
@@ -34,18 +36,22 @@ namespace ConsoleApp1
         }
     }
 
+#if !NET452
     [SimpleJob(RuntimeMoniker.NetCoreApp50)]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
     [SimpleJob(RuntimeMoniker.NetCoreApp21)]
     [SimpleJob(RuntimeMoniker.Net461)]
     [MemoryDiagnoser]
+#endif
     public class ActivityTester
     {
         static PropertyInfo kindPropertyInfo = typeof(Activity).GetProperty("Kind");
         static Action<Activity, ActivityKind> setterNameProperty = CreateSetter("Kind");
         static Action<Activity, ActivityKind> kindSetterDynamicMethod = CreateSetterDynamicMethod();
 
+#if !NET452
         [Benchmark]
+#endif
         public Activity ActivityWithReflection()
         {
             Activity activity = new Activity("activity-with-reflection");
@@ -65,7 +71,9 @@ namespace ConsoleApp1
             }
         }
 
+#if !NET452
         [Benchmark]
+#endif
         public Activity ActivityWithExpression()
         {
             var activity = new Activity("activity-with-expression");
@@ -85,7 +93,9 @@ namespace ConsoleApp1
             }
         }
 
+#if !NET452
         [Benchmark]
+#endif
         public Activity ActivityWithDynamicMethod()
         {
             var activity = new Activity("activity-with-dynamic-method");
@@ -117,86 +127,14 @@ namespace ConsoleApp1
 
         public static Action<Activity, ActivityKind> CreateSetterDynamicMethod()
         {
-            DynamicMethod setterMethod = new DynamicMethod("Activity.Kind.Setter", null, new[] { typeof(object), typeof(ActivityKind) }, true);
+            DynamicMethod setterMethod = new DynamicMethod("Activity.Kind.Setter", null, new[] { typeof(Activity), typeof(ActivityKind) }, true);
             ILGenerator generator = setterMethod.GetILGenerator();
             generator.Emit(OpCodes.Ldarg_0);
             generator.Emit(OpCodes.Ldarg_1);
             generator.Emit(OpCodes.Call, typeof(Activity).GetProperty("Kind", BindingFlags.Public | BindingFlags.Instance).SetMethod);
             generator.Emit(OpCodes.Ret);
-            return (Action<object, ActivityKind>)setterMethod.CreateDelegate(typeof(Action<object, ActivityKind>));
+            return (Action<Activity, ActivityKind>)setterMethod.CreateDelegate(typeof(Action<Activity, ActivityKind>));
         }
     }
 
-    [SimpleJob(RuntimeMoniker.NetCoreApp50)]
-    [SimpleJob(RuntimeMoniker.NetCoreApp31)]
-    [SimpleJob(RuntimeMoniker.NetCoreApp21)]
-    [SimpleJob(RuntimeMoniker.Net461)]
-    [MemoryDiagnoser]
-    public class ActivityNameTester
-    {
-        static PropertyInfo displayNamePropertyInfo = typeof(Activity).GetProperty("DisplayName");
-        static Action<Activity, string> setterNameProperty = CreateSetter("DisplayName");
-        static Action<Activity, string> displayNameSetterDynamicMethod = CreateSetterDynamicMethod();
-
-        [Benchmark]
-        public Activity ActivityPure()
-        {
-            Activity activity = new Activity("activity-with-reflection");
-
-            activity.DisplayName = "new-name";
-
-            return activity;
-        }
-
-        [Benchmark]
-        public Activity ActivityWithReflection()
-        {
-            Activity activity = new Activity("activity-with-reflection");
-
-            displayNamePropertyInfo.SetValue(activity, "new-name");
-
-            return activity;
-        }
-
-        [Benchmark]
-        public Activity ActivityWithExpression()
-        {
-            var activity = new Activity("activity-with-expression");
-
-            setterNameProperty(activity, "new-name");
-
-            return activity;
-        }
-
-        [Benchmark]
-        public Activity ActivityWithDynamicMethod()
-        {
-            var activity = new Activity("activity-with-dynamic-method");
-
-            displayNameSetterDynamicMethod(activity, "new-name");
-
-            return activity;
-        }
-
-        public static Action<Activity, string> CreateSetter(string name)
-        {
-            ParameterExpression instance = Expression.Parameter(typeof(Activity), "instance");
-            ParameterExpression propertyValue = Expression.Parameter(typeof(string), "propertyValue");
-
-            var body = Expression.Assign(Expression.Property(instance, name), propertyValue);
-
-            return Expression.Lambda<Action<Activity, string>>(body, instance, propertyValue).Compile();
-        }
-
-        public static Action<Activity, string> CreateSetterDynamicMethod()
-        {
-            DynamicMethod setterMethod = new DynamicMethod("Activity.DisplayName.Setter", null, new[] { typeof(object), typeof(string) }, true);
-            ILGenerator generator = setterMethod.GetILGenerator();
-            generator.Emit(OpCodes.Ldarg_0);
-            generator.Emit(OpCodes.Ldarg_1);
-            generator.Emit(OpCodes.Callvirt, typeof(Activity).GetProperty("DisplayName", BindingFlags.Public | BindingFlags.Instance).SetMethod);
-            generator.Emit(OpCodes.Ret);
-            return (Action<object, string>)setterMethod.CreateDelegate(typeof(Action<object, string>));
-        }
-    }
 }
