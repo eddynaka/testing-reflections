@@ -5,6 +5,7 @@ using BenchmarkDotNet.Running;
 using System;
 using System.Diagnostics;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Reflection.Emit;
 
 namespace ConsoleApp1
@@ -15,6 +16,7 @@ namespace ConsoleApp1
         {
             Console.WriteLine($"reflection: {MeasureExecTime(ActivityTester.ActivityWithReflectionVoid)}");
             Console.WriteLine($"expression: {MeasureExecTime(ActivityTester.ActivityWithExpressionVoid)}");
+            Console.WriteLine($"dynamicmethod: {MeasureExecTime(ActivityTester.ActivityWithDynamicMethodVoid)}");
 
             var summary = BenchmarkRunner.Run<ActivityTester>();
             //var summary = BenchmarkRunner.Run<ActivityNameTester>();
@@ -30,7 +32,6 @@ namespace ConsoleApp1
             watch.Stop();
             return watch.ElapsedMilliseconds;
         }
-
     }
 
     [SimpleJob(RuntimeMoniker.NetCoreApp50)]
@@ -40,13 +41,16 @@ namespace ConsoleApp1
     [MemoryDiagnoser]
     public class ActivityTester
     {
+        static PropertyInfo kindPropertyInfo = typeof(Activity).GetProperty("Kind");
         static Action<Activity, ActivityKind> setterNameProperty = CreateSetter("Kind");
+        static Action<Activity, ActivityKind> kindSetterDynamicMethod = CreateSetterDynamicMethod();
 
         [Benchmark]
         public Activity ActivityWithReflection()
         {
             Activity activity = new Activity("activity-with-reflection");
-            activity.GetType().GetProperty("Kind").SetValue(activity, ActivityKind.Client);
+
+            kindPropertyInfo.SetValue(activity, ActivityKind.Client);
 
             return activity;
         }
@@ -56,7 +60,8 @@ namespace ConsoleApp1
             for (int i = 0; i < 1_000_000; i++)
             {
                 Activity activity = new Activity("activity-with-reflection");
-                activity.GetType().GetProperty("Kind").SetValue(activity, ActivityKind.Client);
+
+                kindPropertyInfo.SetValue(activity, ActivityKind.Client);
             }
         }
 
@@ -80,6 +85,26 @@ namespace ConsoleApp1
             }
         }
 
+        [Benchmark]
+        public Activity ActivityWithDynamicMethod()
+        {
+            var activity = new Activity("activity-with-dynamic-method");
+
+            kindSetterDynamicMethod(activity, ActivityKind.Client);
+
+            return activity;
+        }
+
+        public static void ActivityWithDynamicMethodVoid()
+        {
+            for (int i = 0; i < 1_000_000; i++)
+            {
+                var activity = new Activity("activity-with-expression");
+
+                kindSetterDynamicMethod(activity, ActivityKind.Client);
+            }
+        }
+
         public static Action<Activity, ActivityKind> CreateSetter(string name)
         {
             ParameterExpression instance = Expression.Parameter(typeof(Activity), "instance");
@@ -89,8 +114,18 @@ namespace ConsoleApp1
 
             return Expression.Lambda<Action<Activity, ActivityKind>>(body, instance, propertyValue).Compile();
         }
-    }
 
+        public static Action<Activity, ActivityKind> CreateSetterDynamicMethod()
+        {
+            DynamicMethod setterMethod = new DynamicMethod("Activity.Kind.Setter", null, new[] { typeof(object), typeof(ActivityKind) }, true);
+            ILGenerator generator = setterMethod.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldarg_1);
+            generator.Emit(OpCodes.Call, typeof(Activity).GetProperty("Kind", BindingFlags.Public | BindingFlags.Instance).SetMethod);
+            generator.Emit(OpCodes.Ret);
+            return (Action<object, ActivityKind>)setterMethod.CreateDelegate(typeof(Action<object, ActivityKind>));
+        }
+    }
 
     [SimpleJob(RuntimeMoniker.NetCoreApp50)]
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
@@ -99,18 +134,15 @@ namespace ConsoleApp1
     [MemoryDiagnoser]
     public class ActivityNameTester
     {
+        static PropertyInfo displayNamePropertyInfo = typeof(Activity).GetProperty("DisplayName");
         static Action<Activity, string> setterNameProperty = CreateSetter("DisplayName");
-        static MyProp prop;
-
-        public ActivityNameTester()
-        {
-            prop = CreatePropertyDictionary(typeof(Activity));
-        }
+        static Action<Activity, string> displayNameSetterDynamicMethod = CreateSetterDynamicMethod();
 
         [Benchmark]
         public Activity ActivityPure()
         {
             Activity activity = new Activity("activity-with-reflection");
+
             activity.DisplayName = "new-name";
 
             return activity;
@@ -120,7 +152,8 @@ namespace ConsoleApp1
         public Activity ActivityWithReflection()
         {
             Activity activity = new Activity("activity-with-reflection");
-            activity.GetType().GetProperty("DisplayName").SetValue(activity, "new-name");
+
+            displayNamePropertyInfo.SetValue(activity, "new-name");
 
             return activity;
         }
@@ -139,7 +172,8 @@ namespace ConsoleApp1
         public Activity ActivityWithDynamicMethod()
         {
             var activity = new Activity("activity-with-dynamic-method");
-            prop.Setter(activity, "new-name");
+
+            displayNameSetterDynamicMethod(activity, "new-name");
 
             return activity;
         }
@@ -154,82 +188,15 @@ namespace ConsoleApp1
             return Expression.Lambda<Action<Activity, string>>(body, instance, propertyValue).Compile();
         }
 
-        private static MyProp CreatePropertyDictionary(Type type)
+        public static Action<Activity, string> CreateSetterDynamicMethod()
         {
-            var prop = type.GetProperty("DisplayName");
-            //var props = new MyProp[allProps.Length];
-
-            //for (int i = 0; i < allProps.Length; i++)
-            //{
-            //    var prop = allProps[i];
-            // Getter dynamic method the signature would be :
-            // object Get(object thisReference)
-            // { return ((TestClass)thisReference).Prop; }
-
-            //DynamicMethod dmGet = new DynamicMethod("Get", typeof(object),
-            //                                     new Type[] { typeof(object), });
-            //ILGenerator ilGet = dmGet.GetILGenerator();
-            //// Load first argument to the stack
-            //ilGet.Emit(OpCodes.Ldarg_0);
-            //// Cast the object on the stack to the apropriate type
-            //ilGet.Emit(OpCodes.Castclass, type);
-            //// Call the getter method passing the object on teh stack as the this reference
-            //ilGet.Emit(OpCodes.Callvirt, prop.GetGetMethod());
-            //// If the property type is a value type (int/DateTime/..)
-            //// box the value so we can return it
-            //if (prop.PropertyType.IsValueType)
-            //{
-            //    ilGet.Emit(OpCodes.Box, prop.PropertyType);
-            //}
-            //// Return from the method
-            //ilGet.Emit(OpCodes.Ret);
-
-
-            // Getter dynamic method the signature would be :
-            // object Set(object thisReference, object propValue)
-            // { return ((TestClass)thisReference).Prop = (PropType)propValue; }
-
-            DynamicMethod dmSet = new DynamicMethod("Set", typeof(void),
-                                         new Type[] { typeof(object), typeof(object) });
-            ILGenerator ilSet = dmSet.GetILGenerator();
-            // Load first argument to the stack and cast it
-            ilSet.Emit(OpCodes.Ldarg_0);
-            ilSet.Emit(OpCodes.Castclass, type);
-
-            // Load secons argument to the stack and cast it or unbox it
-            ilSet.Emit(OpCodes.Ldarg_1);
-            if (prop.PropertyType.IsValueType)
-            {
-                ilSet.Emit(OpCodes.Unbox_Any, prop.PropertyType);
-            }
-            else
-            {
-                ilSet.Emit(OpCodes.Castclass, prop.PropertyType);
-            }
-            // Call Setter method and return
-            ilSet.Emit(OpCodes.Callvirt, prop.GetSetMethod());
-            ilSet.Emit(OpCodes.Ret);
-
-            // Create the delegates for invoking the dynamic methods and add the to an array for later use
-            return new MyProp()
-            {
-                PropName = prop.Name,
-                Setter = (Action<object, object>)
-                                 dmSet.CreateDelegate(typeof(Action<object, object>)),
-                //Getter = (Func<object, object>)
-                //                 dmGet.CreateDelegate(typeof(Func<object, object>)),
-            };
-
-            //}
-            //return props;
+            DynamicMethod setterMethod = new DynamicMethod("Activity.DisplayName.Setter", null, new[] { typeof(object), typeof(string) }, true);
+            ILGenerator generator = setterMethod.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldarg_1);
+            generator.Emit(OpCodes.Callvirt, typeof(Activity).GetProperty("DisplayName", BindingFlags.Public | BindingFlags.Instance).SetMethod);
+            generator.Emit(OpCodes.Ret);
+            return (Action<object, string>)setterMethod.CreateDelegate(typeof(Action<object, string>));
         }
-    }
-
-    //Container for getters and setters of a property
-    public class MyProp
-    {
-        public string PropName { get; set; }
-        public Func<object, object> Getter { get; set; }
-        public Action<object, object> Setter { get; set; }
     }
 }
