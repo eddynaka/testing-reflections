@@ -18,11 +18,14 @@ steps:
 - task: DotNetCoreCLI@2
   inputs:
     command: 'restore'
+    projects: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln'
 
 - task: DotNetCoreCLI@2
   inputs:
     command: 'build'
+    projects: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln'
 
 - task: DotNetCoreCLI@2
   inputs:
     command: 'test'
+    projects: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln'
