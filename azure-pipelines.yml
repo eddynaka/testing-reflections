@@ -25,7 +25,9 @@ steps:
     solution: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln' 
     msbuildArgs: '/p:DeployExtension=false'
 
-- task: DotNetCoreCLI@2
+- task: VSTest@2
   inputs:
-    command: 'test'
-    projects: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln'
+    testAssemblyVer2: | # Required when testSelector == TestAssemblies
+      **\VsAsyncPackage.Tests.dll
+      !**\*TestAdapter.dll
+      !**\obj\** 
