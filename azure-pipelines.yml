@@ -23,7 +23,6 @@ steps:
 - task: VSBuild@1
   inputs:
     solution: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln' 
-    msbuildArgs: '/p:DeployExtension=false'
 
 - task: VSTest@2
   inputs:
