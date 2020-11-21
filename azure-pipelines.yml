@@ -15,15 +15,15 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-- task: DotNetCoreCLI@2
+- task: NuGetCommand@2
   inputs:
     command: 'restore'
-    projects: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln'
+    restoreSolution: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln'
 
-- task: DotNetCoreCLI@2
+- task: VSBuild@1
   inputs:
-    command: 'build'
-    projects: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln'
+    solution: 'VsixTestingSamples-master\VsAsyncPackage\VsAsyncPackage.sln' 
+    msbuildArgs: '/p:DeployExtension=false'
 
 - task: DotNetCoreCLI@2
   inputs:
