@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Madskristensen.VisualStudio.SDK">
+      <Version>14.0.81-pre</Version>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
