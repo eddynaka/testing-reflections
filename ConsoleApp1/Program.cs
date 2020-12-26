@@ -16,9 +16,12 @@ namespace ConsoleApp1
     {
         static void Main(string[] args)
         {
-            Console.WriteLine($"reflection: {MeasureExecTime(ActivityTester.ActivityWithReflectionVoid)}");
-            Console.WriteLine($"expression: {MeasureExecTime(ActivityTester.ActivityWithExpressionVoid)}");
-            Console.WriteLine($"dynamicmethod: {MeasureExecTime(ActivityTester.ActivityWithDynamicMethodVoid)}");
+            //Console.WriteLine($"reflection: {MeasureExecTime(ActivityTester.ActivityWithReflectionVoid)}");
+            //Console.WriteLine($"expression: {MeasureExecTime(ActivityTester.ActivityWithExpressionVoid)}");
+            //Console.WriteLine($"dynamicmethod: {MeasureExecTime(ActivityTester.ActivityWithDynamicMethodVoid)}");
+
+            var tester = new ActivityTester();
+            tester.ActivityWithReflection();
 
             //var summary = BenchmarkRunner.Run<ActivityTester>();
             //var summary = BenchmarkRunner.Run<ActivityNameTester>();
@@ -45,19 +48,25 @@ namespace ConsoleApp1
 #endif
     public class ActivityTester
     {
+        private const string TestSourceName = "TestSourceName";
+        private DiagnosticSource diagnosticSource;
+
         static PropertyInfo kindPropertyInfo = typeof(Activity).GetProperty("Kind");
-        static Action<Activity, ActivityKind> setterNameProperty = CreateSetter("Kind");
+        static Action<Activity, ActivitySource> setterNameProperty = CreateSetter("Source");
         static Action<Activity, ActivityKind> kindSetterDynamicMethod = CreateSetterDynamicMethod();
+
+        public ActivityTester()
+        {
+            this.diagnosticSource = new DiagnosticListener(TestSourceName);
+        }
 
 #if !NET452
         [Benchmark]
 #endif
         public Activity ActivityWithReflection()
         {
-            Activity activity = new Activity("activity-with-reflection");
-
-            kindPropertyInfo.SetValue(activity, ActivityKind.Client);
-
+            var activity = new Activity("Main");
+            setterNameProperty(activity, new ActivitySource("name"));
             return activity;
         }
 
@@ -78,7 +87,7 @@ namespace ConsoleApp1
         {
             var activity = new Activity("activity-with-expression");
 
-            setterNameProperty(activity, ActivityKind.Client);
+            setterNameProperty(activity, new ActivitySource("name"));
 
             return activity;
         }
@@ -89,7 +98,7 @@ namespace ConsoleApp1
             {
                 var activity = new Activity("activity-with-expression");
 
-                setterNameProperty(activity, ActivityKind.Client);
+                setterNameProperty(activity, new ActivitySource("name"));
             }
         }
 
@@ -115,14 +124,14 @@ namespace ConsoleApp1
             }
         }
 
-        public static Action<Activity, ActivityKind> CreateSetter(string name)
+        public static Action<Activity, ActivitySource> CreateSetter(string name)
         {
             ParameterExpression instance = Expression.Parameter(typeof(Activity), "instance");
-            ParameterExpression propertyValue = Expression.Parameter(typeof(ActivityKind), "propertyValue");
+            ParameterExpression propertyValue = Expression.Parameter(typeof(ActivitySource), "propertyValue");
 
             var body = Expression.Assign(Expression.Property(instance, name), propertyValue);
 
-            return Expression.Lambda<Action<Activity, ActivityKind>>(body, instance, propertyValue).Compile();
+            return Expression.Lambda<Action<Activity, ActivitySource>>(body, instance, propertyValue).Compile();
         }
 
         public static Action<Activity, ActivityKind> CreateSetterDynamicMethod()
