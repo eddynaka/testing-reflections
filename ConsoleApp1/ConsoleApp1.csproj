@@ -7,6 +7,10 @@
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.12.1" Condition="'$(TargetFramework)' != 'net452'" />
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.3.37">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="5.0.0-preview.6.20305.6" />
   </ItemGroup>
 
